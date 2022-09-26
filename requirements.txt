@@ -1,0 +1,4 @@
+transformers == 4.22.1
+datasets == 2.5.1
+accelerate == 0.12.0
+librosa
