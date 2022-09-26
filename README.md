@@ -3,6 +3,14 @@ Testing wav2vec 2.0 pre-training with HuggingFace
 
 ## Set up
 
+## Environment
+
+```
+pip install -r requirements.txt
+```
+
+## GitHub (only if you intend to push changes back up to GitHub repo)
+
 ```bash
 # Install sudo (Jarvis Debian doesn't come with sudo)
 apt-get update && apt-get install -y sudo
@@ -19,6 +27,10 @@ gh auth login
 
 # Clone repo using GitHub CLI
 gh repo clone fauxneticien/w2v2-hf-pretrain-test
+
+# Set up credentials
+git config --global user.email "you@example.com"
+git config --global user.name "Your Name"
 ```
 
 ## Stage 1 (Sept 27, 2022):
