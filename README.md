@@ -38,6 +38,8 @@ git config --global user.name "Your Name"
 Attempt to set up correct enviroment and replicate demo run from:
 https://github.com/huggingface/transformers/tree/main/examples/pytorch/speech-pretraining#demo
 
+Run command (note: config set for 1-GPU instance with A6000, 48 GB VRAM):
+
 ```bash
 accelerate launch run_wav2vec2_pretraining_no_trainer.py \
 	--dataset_name="librispeech_asr" \
@@ -61,3 +63,5 @@ accelerate launch run_wav2vec2_pretraining_no_trainer.py \
 	--adam_epsilon="1e-06" \
 	--gradient_checkpointing
 ```
+
+W&B link: https://wandb.ai/fauxneticien/w2v2-pretrain/runs/2n8n06z5?workspace=user-fauxneticien
