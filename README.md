@@ -65,3 +65,31 @@ accelerate launch run_wav2vec2_pretraining_no_trainer.py \
 ```
 
 W&B link: https://wandb.ai/fauxneticien/w2v2-pretrain/runs/2n8n06z5?workspace=user-fauxneticien
+
+## Stage 2 (Octobert 3, 2022):
+
+- Swap out `librispeech_asr` dataset with dataset of interest using HF Datasets library 'audiofolder' feature: https://huggingface.co/docs/datasets/audio_dataset#audiofolder (create dataset from a bunch of audio files in folder). 
+- Use 2.7 hours of Nasal audio for pre-training (split into 90/10 train/test using `--validation_split_percentage="10"`)
+
+```bash
+accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
+	--data_dir="nasal" \
+	--validation_split_percentage="10" \
+	--model_name_or_path="patrickvonplaten/wav2vec2-base-v2" \
+	--output_dir="./wav2vec2-nasal2.7h" \
+	--max_train_steps="150000" \
+	--num_warmup_steps="32000" \
+	--gradient_accumulation_steps="3" \
+	--learning_rate="0.005" \
+	--weight_decay="0.01" \
+	--max_duration_in_seconds="10.0" \
+	--min_duration_in_seconds="2.0" \
+	--logging_steps="1" \
+	--saving_steps="10000" \
+	--per_device_train_batch_size="32" \
+	--per_device_eval_batch_size="32" \
+	--adam_beta1="0.9" \
+	--adam_beta2="0.98" \
+	--adam_epsilon="1e-06" \
+	--gradient_checkpointing
+```
