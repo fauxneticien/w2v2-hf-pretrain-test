@@ -93,3 +93,32 @@ accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 	--adam_epsilon="1e-06" \
 	--gradient_checkpointing
 ```
+
+## Stage 3 (October 14, 2022):
+
+- Change dataset to 4.5 hour dataset (instead of 2.7 hour dataset)
+	- Minimum wav duration is now 1.5s and maximum wav duration is 2.5s
+	- Smaller range around the median of wav durations allows us to 1) use as much data as possible and 2) use a bigger batch size without worrying about accidental OOM issues (i.e. 1 very long wav file causes batch to be bigger than what GPU memory can fit)
+
+```bash
+accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
+	--data_dir="20221014_nasal/data" \
+	--validation_split_percentage="10" \
+	--model_name_or_path="patrickvonplaten/wav2vec2-base-v2" \
+	--output_dir="./facebook-wav2vec2-base_nasal4.5h" \
+	--max_train_steps="150000" \
+	--num_warmup_steps="32000" \
+	--gradient_accumulation_steps="1" \
+	--learning_rate="0.0005" \
+	--weight_decay="0.01" \
+	--max_duration_in_seconds="3" \
+	--min_duration_in_seconds="1" \
+	--logging_steps="1" \
+	--saving_steps="10000" \
+	--per_device_train_batch_size="200" \
+	--per_device_eval_batch_size="200" \
+	--adam_beta1="0.9" \
+	--adam_beta2="0.98" \
+	--adam_epsilon="1e-06" \
+	--gradient_checkpointing
+```
