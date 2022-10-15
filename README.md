@@ -100,23 +100,37 @@ accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 	- Minimum wav duration is now 1.5s and maximum wav duration is 2.5s
 	- Smaller range around the median of wav durations allows us to 1) use as much data as possible and 2) use a bigger batch size without worrying about accidental OOM issues (i.e. 1 very long wav file causes batch to be bigger than what GPU memory can fit)
 
+- WHOOPS: turns out the old code was randomly initializing a new model (updated code to load pre-trained weights):
+
+	```python
+	# initialize random model
+    # model = Wav2Vec2ForPreTraining(config)
+
+    # load pre-trained model
+    model = Wav2Vec2ForPreTraining.from_pretrained(args.model_name_or_path)
+	```	
+
+	- But the way wav2vec 2 models are pre-trained has changed since the original paper so not all checkpoints can be continued to be pre-trained (at least using HF code, see https://discuss.huggingface.co/t/pretrain-facebook-wav2vec2-base/14121/3?u=fauxneticien and https://github.com/facebookresearch/fairseq/issues/3277)
+
+- Try continue pre-training from one of the latest official model checkpoints (XLS-R 300m) using model weights from https://huggingface.co/facebook/wav2vec2-xls-r-300m and pre-training config from https://huggingface.co/patrickvonplaten/wav2vec2-large-repro-960h-libri-120k-steps
+
 ```bash
 accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 	--data_dir="20221014_nasal/data" \
 	--validation_split_percentage="10" \
-	--model_name_or_path="patrickvonplaten/wav2vec2-base-v2" \
-	--output_dir="./facebook-wav2vec2-base_nasal4.5h" \
-	--max_train_steps="150000" \
+	--model_name_or_path="xls-r_300m" \
+	--output_dir="./xls-r0.3b_nasal4.5h" \
+	--max_train_steps="75000" \
 	--num_warmup_steps="32000" \
-	--gradient_accumulation_steps="1" \
+	--gradient_accumulation_steps="2" \
 	--learning_rate="0.0005" \
 	--weight_decay="0.01" \
 	--max_duration_in_seconds="3" \
 	--min_duration_in_seconds="1" \
 	--logging_steps="1" \
 	--saving_steps="10000" \
-	--per_device_train_batch_size="200" \
-	--per_device_eval_batch_size="200" \
+	--per_device_train_batch_size="64" \
+	--per_device_eval_batch_size="64" \
 	--adam_beta1="0.9" \
 	--adam_beta2="0.98" \
 	--adam_epsilon="1e-06" \

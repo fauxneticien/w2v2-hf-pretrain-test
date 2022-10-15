@@ -480,7 +480,10 @@ def main():
         )
 
     # initialize random model
-    model = Wav2Vec2ForPreTraining(config)
+    # model = Wav2Vec2ForPreTraining(config)
+
+    # load pre-trained model
+    model = Wav2Vec2ForPreTraining.from_pretrained(args.model_name_or_path)
 
     # Activate gradient checkpointing if needed
     if args.gradient_checkpointing:
