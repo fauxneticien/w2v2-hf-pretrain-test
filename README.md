@@ -136,3 +136,59 @@ accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 	--adam_epsilon="1e-06" \
 	--gradient_checkpointing
 ```
+
+## Stage 4 (December 1, 2022):
+
+### Prerequisites
+
+#### Configure model with a specific config
+
+Whether this script is happy to do continuing pretraining seems to depend on the configuration of the seed model. For now we'll just use the config of a model that is known to work with this script (but swap out the weights from other wav2vec 2 models we want to start from). To do this run:
+
+```bash
+bash get_xls-r_model.sh
+```
+
+In the default configuration, it will fetch weights from the XLS-R model (https://huggingface.co/facebook/wav2vec2-xls-r-300m) but use the configuration from PvP's pretraining example (https://huggingface.co/patrickvonplaten/wav2vec2-large-repro-960h-libri-120k-steps) created by the pretraining example scripts (https://github.com/huggingface/transformers/tree/main/examples/pytorch/speech-pretraining).
+
+#### Run `accelerate config`
+
+Run `accelerate config` and answer the questions as appropriate, e.g.:
+
+```
+accelerate config
+In which compute environment are you running? ([0] This machine, [1] AWS (Amazon SageMaker)): 0
+Which type of machine are you using? ([0] No distributed training, [1] multi-CPU, [2] multi-GPU, [3] TPU [4] MPS): 2
+How many different machines will you use (use more than 1 for multi-node training)? [1]: 1
+Do you want to use DeepSpeed? [yes/NO]: NO
+Do you want to use FullyShardedDataParallel? [yes/NO]: NO
+How many GPU(s) should be used for distributed training? [1]:2
+Do you wish to use FP16 or BF16 (mixed precision)? [NO/fp16/bf16]: fp16
+```
+
+### Training
+
+Since `20221014_nasal` is a relative controlled for duration (mean 2.5s +/- 0.5s), we can try a per device batch size of 50 examples with 2 A100 GPUs and gradient accumulation of 8, then effective batch size is (2.5s x 50ex x 2gpu x 16acc) / 60 = ~66mins.
+
+```bash
+accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
+	--data_dir="20221014_nasal/data" \
+	--validation_split_percentage="10" \
+	--model_name_or_path="xls-r_300m" \
+	--output_dir="./xls-r0.3b_nasal4.5h" \
+	--max_train_steps="75000" \
+	--num_warmup_steps="32000" \
+	--learning_rate="0.0005" \
+	--weight_decay="0.01" \
+	--max_duration_in_seconds="3" \
+	--min_duration_in_seconds="1" \
+	--logging_steps="1" \
+	--saving_steps="10000" \
+	--gradient_accumulation_steps="16" \
+	--per_device_train_batch_size="50" \
+	--per_device_eval_batch_size="50" \
+	--adam_beta1="0.9" \
+	--adam_beta2="0.98" \
+	--adam_epsilon="1e-06" \
+	--gradient_checkpointing
+```
