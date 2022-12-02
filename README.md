@@ -192,3 +192,43 @@ accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 	--adam_epsilon="1e-06" \
 	--gradient_checkpointing
 ```
+
+## Stage 5 (December 2, 2022):
+
+### Prerequisites
+
+- Run `bash get_xls-r_model.sh` and `accelerate config` as explained above in Stage 4
+
+### Dynamic batching
+
+- Dynamic batching is now implemented so batch sizes are dynamically determined by `dynamic_batch_max_duration` (in seconds). This controls the per-GPU duration of each batch.
+
+### 8-bit Adam
+
+- Since `bnb.optim.AdamW` from `bitsandbytes` is a drop-in replacement for `hf/torch.Adam`, we use it here for further training memory efficiency
+
+```bash
+accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
+	--data_dir="20221014_nasal/data" \
+	--validation_split_percentage="10" \
+	--model_name_or_path="xls-r_300m" \
+	--output_dir="./xls-r0.3b_nasal4.5h" \
+	--max_train_steps="75000" \
+	--num_warmup_steps="32000" \
+	--learning_rate="0.0005" \
+	--weight_decay="0.01" \
+	--max_duration_in_seconds="3" \
+	--min_duration_in_seconds="1" \
+	--logging_steps="1" \
+	--saving_steps="10000" \
+	--gradient_accumulation_steps="16" \
+	--dynamic_batch_max_duration="30" \
+	--dynamic_batch_num_buckets="30" \
+	--dynamic_batch_ordering="ascending" \
+	--per_device_eval_batch_size="8" \
+	--adam_beta1="0.9" \
+	--adam_beta2="0.98" \
+	--adam_epsilon="1e-06" \
+	--gradient_checkpointing
+
+```
