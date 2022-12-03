@@ -236,6 +236,7 @@ accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 ## Stage 5 (December 3, 2022):
 
 - Turns out multi-GPU doesn't work if using latest version of accelerate. Seems to work fine with `accelerate==0.12.0`.
+	- Updated `requirements.txt` accordingly
 - But `accelerate==0.12.0` isn't compatible with dynamic batching. So stick to static batching for now.
 - Use `max_duration_in_seconds` to control what the biggest length utterance is passed to trainer.
 - On a 48GB A6000, batch size of `64` seems to just fit with `max_duration_in_seconds=30` (leaving some buffer for different combinations of utterances)
