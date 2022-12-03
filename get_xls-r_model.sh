@@ -1,4 +1,4 @@
-OUTPUT_DIR="xls-r_300m"
+OUTPUT_DIR="models/xls-r_300m"
 
 mkdir -p $OUTPUT_DIR
 pushd $OUTPUT_DIR

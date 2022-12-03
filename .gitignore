@@ -1,0 +1,5 @@
+wandb
+data/*
+models/*
+!data/.gitkeep
+!models/.gitkeep

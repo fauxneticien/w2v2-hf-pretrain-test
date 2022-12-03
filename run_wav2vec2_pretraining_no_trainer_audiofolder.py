@@ -127,12 +127,12 @@ def parse_args():
         default=None,
         help="Path to the validation cached file name",
     )
-    # parser.add_argument(
-    #     "--per_device_train_batch_size",
-    #     type=int,
-    #     default=8,
-    #     help="Batch size (per device) for the training dataloader.",
-    # )
+    parser.add_argument(
+        "--per_device_train_batch_size",
+        type=int,
+        default=8,
+        help="Batch size (per device) for the training dataloader.",
+    )
     parser.add_argument(
         "--per_device_eval_batch_size",
         type=int,
@@ -202,31 +202,6 @@ def parse_args():
         type=float,
         default=3.0,
         help="Filter out audio files that are shorter than `min_duration_in_seconds` seconds",
-    )
-    parser.add_argument(
-        "--dynamic_batch_max_duration",
-        type=float,
-        default=15,
-        help="Maximum duration of batches for dynamic batching",
-    )
-    parser.add_argument(
-        "--dynamic_batch_num_buckets",
-        type=int,
-        default=30,
-        help="Number of buckets for dynamic batching",
-    )
-    parser.add_argument(
-        "--dynamic_batch_shuffle",
-        type=bool,
-        default=False,
-        help="Whether or not dynamic batching should shuffle training dataset",
-    )
-    parser.add_argument(
-        "--dynamic_batch_ordering",
-        type=str,
-        default="ascending",
-        # Apparently ascending results in faster training and somewhat better performance
-        help="How to sort training dataset (random, or ascending or descending by length)",
     )
     parser.add_argument(
         "--pad_to_multiple_of",
@@ -314,11 +289,10 @@ class DataCollatorForWav2Vec2Pretraining:
             return_tensors="pt",
         )
 
+        print(f"Batch size: {len(features)}, Total duration: {sum([ len(f['input_values']) for f in features ])/16_000}")
+
         device = batch["input_values"].device
         batch_size = batch["input_values"].shape[0]
-
-        # Debug dynamic batching
-        # print(f"Device: {device}, Batch size: {len(features)}, Total duration: {sum([ len(f['input_values']) for f in features ])/16_000}")
 
         mask_indices_seq_length = self.model._get_feat_extract_output_lengths(batch["input_values"].shape[-1])
         # make sure masked sequence length is a Python scalar
@@ -384,8 +358,7 @@ def main():
     send_example_telemetry("run_wav2vec2_pretraining_no_trainer", args)
 
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
-    # Set even_batches=False for dynamic batching
-    accelerator = Accelerator(even_batches=False)
+    accelerator = Accelerator()
     logger.info(accelerator.state, main_process_only=False)
     if accelerator.is_local_main_process:
         datasets.utils.logging.set_verbosity_warning()
@@ -488,8 +461,7 @@ def main():
                 input_columns=["input_length"],
             )
 
-        # Keep lengths for dynamic batching
-        # vectorized_datasets = vectorized_datasets.remove_columns("input_length")
+        vectorized_datasets = vectorized_datasets.remove_columns("input_length")
 
     # for large datasets it is advised to run the preprocessing on a
     # single machine first with ``args.preprocessing_only`` since there will mostly likely
@@ -524,46 +496,12 @@ def main():
     data_collator = DataCollatorForWav2Vec2Pretraining(
         model=model, feature_extractor=feature_extractor, pad_to_multiple_of=args.pad_to_multiple_of
     )
-
-    # Remove default static batching
-    # train_dataloader = DataLoader(
-    #     vectorized_datasets["train"],
-    #     shuffle=True,
-    #     collate_fn=data_collator,
-    #     batch_size=args.per_device_train_batch_size,
-    # )
-
-    from speechbrain.dataio.sampler import DynamicBatchSampler
-
-    # Make train_dataset compatible with structure DynamicBatchSampler() expects
-    vectorized_datasets["train"].data_ids = None
-
-    lengths_list=[ il/16_000 for il in vectorized_datasets["train"]["input_length"] ]
-
-    # Remove input lengths column, otherwiser forward() complains
-    with accelerator.main_process_first():
-        vectorized_datasets = vectorized_datasets.remove_columns("input_length")
-
-    train_sampler = DynamicBatchSampler(
-        dataset=vectorized_datasets["train"],
-        lengths_list=lengths_list,
-        num_buckets=args.dynamic_batch_num_buckets,
-        max_batch_length=args.dynamic_batch_max_duration,
-        shuffle=args.dynamic_batch_shuffle,
-        batch_ordering=args.dynamic_batch_ordering
-    )
-
     train_dataloader = DataLoader(
         vectorized_datasets["train"],
-        batch_sampler=train_sampler,
+        shuffle=True,
         collate_fn=data_collator,
-        # Let DynamicBatchSampler do the sorting
-        shuffle=False
+        batch_size=args.per_device_train_batch_size,
     )
-
-    # Make dataloader compatible with structure accelerate.prepare expects
-    train_dataloader.batch_sampler.sampler = train_dataloader.sampler
-
     eval_dataloader = DataLoader(
         vectorized_datasets["validation"], collate_fn=data_collator, batch_size=args.per_device_eval_batch_size
     )
@@ -598,15 +536,13 @@ def main():
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     # 5. Train
-    total_batch_size = args.dynamic_batch_max_duration * accelerator.num_processes * args.gradient_accumulation_steps
-
-    if accelerator.is_local_main_process:
-        print(f"  Instantaneous batch size per device ~= {args.dynamic_batch_max_duration} seconds")
-        print(f"  Total train batch size (w. parallel, distributed & accumulation) ~= {total_batch_size} seconds ~= {total_batch_size/60} minutes")
+    total_batch_size = args.per_device_train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(vectorized_datasets['train'])}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
+    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     completed_steps = 0
@@ -619,6 +555,10 @@ def main():
     for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
         for step, batch in enumerate(train_dataloader):
+
+            # if accelerator.is_main_process:
+            #     print(f"Grad acc. step: {(step % args.gradient_accumulation_steps) + 1}")
+
             # compute num of losses
             num_losses = batch["mask_time_indices"].sum()
             sub_attention_mask = batch.pop("sub_attention_mask", None)

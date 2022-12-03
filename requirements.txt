@@ -1,7 +1,9 @@
-transformers == 4.25.1
-datasets == 2.7.1
-accelerate == 0.15.0
+# Released package versions as of September 6, 2022
+# when run_wav2vec2_pretraining_no_trainer.py was last updated
+accelerate == 0.12.0
+transformers == 4.21.3
 librosa
-wandb == 0.13.4
-speechbrain==0.5.13
+# But need at least datasets 2.5.0 for audiofolder
+datasets == 2.5.2
 bitsandbytes==0.35.4
+wandb == 0.13.4

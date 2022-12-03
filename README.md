@@ -232,3 +232,34 @@ accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
 	--gradient_checkpointing
 
 ```
+
+## Stage 5 (December 3, 2022):
+
+- Turns out multi-GPU doesn't work if using latest version of accelerate. Seems to work fine with `accelerate==0.12.0`.
+- But `accelerate==0.12.0` isn't compatible with dynamic batching. So stick to static batching for now.
+- Use `max_duration_in_seconds` to control what the biggest length utterance is passed to trainer.
+- On a 48GB A6000, batch size of `64` seems to just fit with `max_duration_in_seconds=30` (leaving some buffer for different combinations of utterances)
+	- With 3xA6000 and `gradient_accumulation_steps=10`, we get a batch size of around 64 minutes (~ 2s avg. per utt x 64 utts per GPU x 3 GPUs x 10 grad acc steps = 3840 s = 64 mins)
+
+```bash
+accelerate launch run_wav2vec2_pretraining_no_trainer_audiofolder.py \
+	--data_dir="data/20221014_nasal/data" \
+	--validation_split_percentage="10" \
+	--model_name_or_path="models/xls-r_300m" \
+	--output_dir="models/xls-r_300m-cpt_nasal4.5h" \
+	--max_train_steps="20000" \
+	--num_warmup_steps="2000" \
+	--learning_rate="1e-4" \
+	--weight_decay="0.01" \
+	--max_duration_in_seconds="30" \
+	--min_duration_in_seconds="1" \
+	--logging_steps="1" \
+	--saving_steps="2500" \
+	--gradient_accumulation_steps="10" \
+	--per_device_train_batch_size="64" \
+	--per_device_eval_batch_size="64" \
+	--adam_beta1="0.9" \
+	--adam_beta2="0.98" \
+	--adam_epsilon="1e-06" \
+	--gradient_checkpointing
+```
