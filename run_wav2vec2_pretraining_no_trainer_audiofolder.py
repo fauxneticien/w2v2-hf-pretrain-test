@@ -29,6 +29,7 @@ from torch.utils.data.dataloader import DataLoader
 from tqdm.auto import tqdm
 
 import transformers
+from dbs_accelerator import AcceleratorWithDynamicBatchSampling
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from huggingface_hub import Repository
@@ -204,6 +205,30 @@ def parse_args():
         help="Filter out audio files that are shorter than `min_duration_in_seconds` seconds",
     )
     parser.add_argument(
+        "--dbs_max_batch_length",
+        type=float,
+        default=4.0,
+        help="Dynamic batch sampling: maximum duration of batch per device in seconds",
+    )
+    parser.add_argument(
+        "--dbs_num_buckets",
+        type=int,
+        default=20,
+        help="Dynamic batch sampling: number of buckets to divide durations into",
+    )
+    parser.add_argument(
+        "--dbs_batch_ordering",
+        type=str,
+        default="ascending",
+        help="Dynamic batch sampling: how to sort examples (ascending, descending, random)",
+    )
+    parser.add_argument(
+        "--dbs_shuffle",
+        type=bool,
+        default=False,
+        help="Dynamic batch sampling: whether to shuffle at each epoch (don't use with ordering ascending or descending)",
+    )
+    parser.add_argument(
         "--pad_to_multiple_of",
         type=int,
         default=None,
@@ -289,7 +314,21 @@ class DataCollatorForWav2Vec2Pretraining:
             return_tensors="pt",
         )
 
-        print(f"Batch size: {len(features)}, Total duration: {sum([ len(f['input_values']) for f in features ])/16_000}")
+        batch_dur     = 0
+        batch_padding = []
+
+        for raw_feats, padded_feats in zip(features, batch['input_values']):
+            raw_feat_len = len(raw_feats['input_values'])
+            batch_dur += raw_feat_len / 16_000
+
+            pad_feat_len = len(padded_feats)
+            pc_padding = (pad_feat_len - raw_feat_len) / pad_feat_len * 100
+
+            batch_padding.append(pc_padding)
+
+            # print(f"{raw_feat_len=}, {pad_feat_len=}, {pc_padding=}")
+
+        print(f"Batch size: {len(features)}, Total duration: {batch_dur:.2f}, Percent padding: {sum(batch_padding) / len(batch_padding):.2f}%")
 
         device = batch["input_values"].device
         batch_size = batch["input_values"].shape[0]
@@ -358,7 +397,16 @@ def main():
     send_example_telemetry("run_wav2vec2_pretraining_no_trainer", args)
 
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
-    accelerator = Accelerator()
+    # accelerator = Accelerator()
+
+    dynamic_batch_sampler_args = {
+        "num_buckets": args.dbs_num_buckets,
+        "max_batch_length": args.dbs_max_batch_length,
+        "batch_ordering": args.dbs_batch_ordering,
+        "shuffle" : args.dbs_shuffle
+    }
+
+    accelerator = AcceleratorWithDynamicBatchSampling(dynamic_batch_sampler_args=dynamic_batch_sampler_args)
     logger.info(accelerator.state, main_process_only=False)
     if accelerator.is_local_main_process:
         datasets.utils.logging.set_verbosity_warning()
