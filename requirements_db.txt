@@ -1,0 +1,8 @@
+speechbrain == 0.5.13
+accelerate == 0.16.0
+transformers == 4.26.1
+librosa
+# But need at least datasets 2.5.0 for audiofolder
+datasets == 2.10.1
+bitsandbytes==0.37.0
+wandb == 0.13.11
