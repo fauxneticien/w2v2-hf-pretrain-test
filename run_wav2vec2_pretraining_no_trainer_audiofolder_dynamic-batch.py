@@ -823,9 +823,10 @@ def main():
     # Use CoPT config from M2DS2
     model = Wav2Vec2ForPreTraining.from_pretrained(
         args.model_name_or_path,
+        activation_dropout=0.1,
         attention_dropout=0.1,
         hidden_dropout=0.1,
-        feat_proj_dropout=0.0,
+        feat_proj_dropout=0.1,
         mask_time_prob=0.4,
         layerdrop=0.1
     )
@@ -1012,7 +1013,7 @@ def main():
                         wandb.log(train_logs)
 
             # save model every `args.saving_steps` steps
-            if (step + 1) % (args.gradient_accumulation_steps * args.saving_steps) == 0:
+            if (step + 1) % (args.saving_steps) == 0:
                 if (args.push_to_hub and epoch < args.num_train_epochs - 1) or args.output_dir is not None:
                     accelerator.wait_for_everyone()
                     unwrapped_model = accelerator.unwrap_model(model)

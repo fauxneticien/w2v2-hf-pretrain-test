@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  gpu:
+    image: pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime
+    volumes:
+      - ${PWD}:/workspace
+      - ${PWD}/tmp/cache:/root/.cache
+    working_dir: /workspace
+    entrypoint:
+      - /bin/bash
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
